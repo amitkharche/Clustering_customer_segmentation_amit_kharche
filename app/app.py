@@ -1,37 +1,21 @@
-
 """
 Streamlit App for Mall Customer Segmentation
 """
 
 import streamlit as st
 import pandas as pd
-import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
 import os
-import joblib
 
+from inference import load_model, predict_cluster
+from feature_engineering import feature_selection  # Optional, depends on pipeline
 
 REQUIRED_COLUMNS = ["Annual Income (k$)", "Spending Score (1-100)"]
 
 st.set_page_config(page_title="Customer Segmentation App", layout="wide")
 st.title("🛍️ Mall Customer Segmentation App")
-
-@st.cache_resource
-def load_model():
-    """Load trained KMeans model and scaler."""
-    try:
-        #st.write("📁 Files in models/:", os.listdir("models"))  # Debug helper
-        model = joblib.load("models/kmeans_model.pkl")
-        scaler = joblib.load("models/scaler.pkl")
-        return model, scaler
-    except FileNotFoundError as e:
-        st.error(f"❌ File not found: {e}")
-        return None, None
-    except Exception as e:
-        st.error(f"❌ Error loading model or scaler: {e}")
-        return None, None
 
 def validate_data(df: pd.DataFrame) -> bool:
     """Check if required columns are present."""
@@ -42,42 +26,41 @@ def validate_data(df: pd.DataFrame) -> bool:
     return True
 
 def predict_and_visualize(df: pd.DataFrame, model, scaler):
-    """Generate cluster predictions and PCA visualization."""
+    """Apply preprocessing, predict clusters, and show PCA chart."""
 
-    # Drop CustomerID if present
+    # Step 1: Feature engineering (if any)
+    df = feature_selection(df)
+
+    # Step 2: Drop ID column
     if "CustomerID" in df.columns:
         df = df.drop(columns=["CustomerID"])
 
-    # One-hot encode Gender column
+    # Step 3: One-hot encode categorical (e.g., Gender)
     df = pd.get_dummies(df, drop_first=True)
 
-    # Ensure columns match those used during training
+    # Step 4: Align features with training columns
     df = df.reindex(columns=scaler.feature_names_in_, fill_value=0)
 
-    # Scale the input
+    # Step 5: Scale and predict
     scaled = scaler.transform(df)
+    df["Cluster"] = predict_cluster(model, scaled)
 
-    # Predict cluster
-    clusters = model.predict(scaled)
-    df["Cluster"] = clusters
-
-    # Add PCA for visualization
+    # Step 6: PCA for visualization
     pca = PCA(n_components=2)
-    components = pca.fit_transform(scaled)
-    df["PCA1"], df["PCA2"] = components[:, 0], components[:, 1]
+    reduced = pca.fit_transform(scaled)
+    df["PCA1"], df["PCA2"] = reduced[:, 0], reduced[:, 1]
 
-    # Show results
+    # Step 7: Show table and plot
     st.subheader("Segmented Customers")
     st.dataframe(df)
 
-    fig, ax = plt.subplots(figsize=(6,4))
+    fig, ax = plt.subplots(figsize=(6, 4))
     sns.scatterplot(data=df, x="PCA1", y="PCA2", hue="Cluster", palette="Set2", s=100, ax=ax)
     ax.set_title("Customer Segments (PCA Projection)")
     st.pyplot(fig)
 
-
 def main():
-    st.write("📌 Current working directory:", os.getcwd())  # Debug current path
+    st.write("📌 Current working directory:", os.getcwd())
 
     uploaded_file = st.file_uploader("Upload a CSV file with customer data", type=["csv"])
     if uploaded_file:

@@ -1,0 +1,6 @@
+2025-06-10 20:49:50,814 - INFO - Started training pipeline
+2025-06-10 20:49:50,821 - INFO - Loaded data with shape (1000, 5)
+2025-06-10 20:49:50,821 - INFO - Feature selection completed
+2025-06-10 20:49:50,837 - INFO - Preprocessing completed
+2025-06-10 20:49:51,106 - INFO - Model trained with silhouette score: 0.3302
+2025-06-10 20:49:51,106 - INFO - Scaler saved to models/scaler.pkl
